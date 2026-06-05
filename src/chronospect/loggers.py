@@ -52,10 +52,13 @@ class TrajectoryRecorder:
         self._frames.append(_to_row(state))
 
     def forward_hook(self, _module: Any, _inputs: Any, output: Any) -> None:
-        """A ``torch`` forward hook: records the module output each call.
+        """A ``torch`` forward hook: records the module's output tensor each call.
 
-        For modules returning a tuple (e.g. ``nn.GRU`` -> ``(out, h)``) the first
-        element is recorded; override :meth:`record` calls for finer control.
+        The output is flattened as-is, so this is best for a module that emits a
+        single state vector per call (batch size 1).  For an ``nn.GRU``/``nn.LSTM``
+        the first tuple element is the *output sequence*, not the hidden state --
+        use :func:`record_rnn_states` if you want hidden states, or call
+        :meth:`record` manually with the exact tensor you want.
         """
         out = output[0] if isinstance(output, tuple) else output
         self.record(out)
@@ -78,11 +81,21 @@ class TrajectoryRecorder:
         self.detach()
 
     def trajectory(self) -> np.ndarray:
-        """Return the recorded ``(T, d)`` trajectory (frames padded/truncated to a common width)."""
+        """Return the recorded ``(T, d)`` trajectory.
+
+        Every recorded frame must have the same width; a mismatch raises rather
+        than silently truncating, since dropping columns would discard exactly
+        the memory content the instrument is meant to measure.
+        """
         if not self._frames:
             raise ValueError("no frames recorded")
-        width = min(f.size for f in self._frames)
-        return np.stack([f[:width] for f in self._frames], axis=0)
+        widths = {f.size for f in self._frames}
+        if len(widths) > 1:
+            raise ValueError(
+                f"recorded frames have inconsistent widths {sorted(widths)}; "
+                "record a fixed-size state each step (reduce/flatten consistently)"
+            )
+        return np.stack(self._frames, axis=0)
 
 
 def record_rnn_states(rnn: Any, inputs: Any) -> np.ndarray:
@@ -97,6 +110,11 @@ def record_rnn_states(rnn: Any, inputs: Any) -> np.ndarray:
     x = inputs
     if x.dim() == 2:
         x = x.unsqueeze(1)  # (T, 1, input_size)
+    if x.dim() != 3 or x.shape[1] != 1:
+        raise ValueError(
+            "record_rnn_states expects inputs shaped (T, input) or (T, 1, input) "
+            f"(batch size 1); got {tuple(inputs.shape)}"
+        )
     T = x.shape[0]
     h = None
     frames = []

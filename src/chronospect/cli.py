@@ -18,11 +18,13 @@ import numpy as np
 
 
 def _load_array(path: str) -> np.ndarray:
-    if path.endswith(".npz"):
-        npz = np.load(path)
-        key = "X" if "X" in npz.files else npz.files[0]
-        return np.asarray(npz[key], dtype=float)
-    return np.asarray(np.load(path), dtype=float)
+    # dispatch on what np.load actually returns, not on the file extension,
+    # so a renamed archive or a plain .npy named .npz still loads correctly.
+    obj = np.load(path, allow_pickle=False)
+    if isinstance(obj, np.lib.npyio.NpzFile):
+        key = "X" if "X" in obj.files else obj.files[0]
+        return np.asarray(obj[key], dtype=float)
+    return np.asarray(obj, dtype=float)
 
 
 def _cmd_gate(args: argparse.Namespace) -> int:

@@ -65,8 +65,7 @@ def two_time_correlation(
             continue
         starts = np.arange(lo, hi + 1)
         for j, tau in enumerate(taus):
-            s = starts[starts + tau < T]
-            s = s[s >= 0]
+            s = starts[(starts + tau >= 0) & (starts + tau < T)]
             if s.size == 0:
                 continue
             a = Xe[:, s, :]  # (n, |s|, d)
@@ -90,6 +89,9 @@ def _half_life(curve: np.ndarray, taus: np.ndarray, frac: float) -> float:
     curve, taus = curve[valid], taus[valid]
     if curve.size < 2:
         return float("nan")
+    if curve[0] <= frac:
+        # already below the threshold at the first sampled lag; do not extrapolate
+        return float(taus[0])
     for k in range(1, len(curve)):
         if curve[k] <= frac:
             c0, c1 = curve[k - 1], curve[k]
@@ -106,7 +108,7 @@ def aging_index(
     taus: np.ndarray,
     *,
     frac: float = 1.0 / np.e,
-    t_stat_min: float = 2.5,
+    alpha: float = 0.05,
 ) -> float:
     """Quantify how strongly the decay timescale grows with waiting time.
 
@@ -117,13 +119,16 @@ def aging_index(
         index = beta * (t_w_max - t_w_min) / mean_half_life
 
     To avoid mistaking finite-ensemble noise for aging, the slope is reported
-    only when it is **positive and statistically significant** (Student-t on the
-    regression slope exceeds ``t_stat_min``); otherwise the index is exactly 0.
-    A stationary memory therefore reads ~0 regardless of how it is split across
-    timescales, while a genuinely aging memory -- whose half-life climbs
-    systematically with ``t_w`` -- reads large.  Returns ``nan`` if fewer than
-    three waiting times yield a finite half-life.
+    only when it is **positive and statistically significant**: its one-sided
+    Student-t statistic must exceed the critical value for the actual degrees of
+    freedom at level ``alpha`` (so three waiting times demand a much larger
+    t-stat than ten do); otherwise the index is exactly 0.  A stationary memory
+    therefore reads ~0 regardless of how it is split across timescales, while a
+    genuinely aging memory reads large.  Returns ``nan`` if fewer than three
+    waiting times yield a finite half-life.
     """
+    from scipy.stats import t as _student_t
+
     C = np.asarray(C, dtype=float)
     taus = np.asarray(taus, dtype=float)
     tw = np.asarray(t_ws, dtype=float)
@@ -148,9 +153,10 @@ def aging_index(
         s2 = float(np.sum(resid**2)) / dof
         se_beta = np.sqrt(s2 / sxx) if s2 > 0 else 0.0
         t_stat = beta / se_beta if se_beta > 0 else np.inf
+        t_crit = float(_student_t.ppf(1.0 - alpha, dof))
     else:
-        t_stat = np.inf  # cannot assess significance -> do not gate
+        t_stat, t_crit = np.inf, 0.0  # cannot assess significance -> do not gate
 
-    if beta <= 0 or t_stat < t_stat_min:
+    if beta <= 0 or t_stat < t_crit:
         return 0.0
     return float(beta * span / mean)

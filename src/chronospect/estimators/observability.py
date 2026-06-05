@@ -67,7 +67,8 @@ def windowed_effective_rank(
         flat = seg.reshape(-1, seg.shape[-1])  # (n*window, d)
         s = np.linalg.svd(flat, compute_uv=False)
         centers.append(start + window / 2.0)
-        ranks.append(effective_rank(s))
+        # covariance eigenvalues are s**2; effective rank of the covariance
+        ranks.append(effective_rank(s**2))
     return np.asarray(centers), np.asarray(ranks)
 
 

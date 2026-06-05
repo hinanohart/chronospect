@@ -77,19 +77,27 @@ def multi_timescale(
     rng = np.random.default_rng(seed)
     ts = np.asarray(timescales, dtype=float)
     k = len(ts)
+    if k > d:
+        raise ValueError(f"need d >= number of timescales ({k}); got d={d}")
     if weights is None:
         weights = tuple(1.0 / k for _ in range(k))
     w = np.asarray(weights, dtype=float)
     w = w / w.sum()
-    # assign dimension counts proportional to weights (at least 1 each)
-    counts = np.maximum(1, np.round(w * d).astype(int))
-    # fix rounding so counts sum to d
-    while counts.sum() > d and np.any(counts > 1):
-        counts[np.argmax(counts)] -= 1
-    while counts.sum() < d:
-        counts[np.argmin(counts)] += 1
+    # allocate dimensions to timescales: one each, then distribute the rest by
+    # largest remainder so the counts provably sum to exactly d.
+    counts = np.ones(k, dtype=int)
+    remaining = d - k
+    if remaining > 0:
+        frac = w * remaining
+        add = np.floor(frac).astype(int)
+        counts += add
+        deficit = remaining - int(add.sum())
+        order = np.argsort(-(frac - np.floor(frac)))
+        for i in range(deficit):
+            counts[order[i % k]] += 1
+    assert counts.sum() == d, (counts, d)
 
-    out = np.empty((n_traj, T, sum(counts)))
+    out = np.empty((n_traj, T, int(counts.sum())))
     for i in range(n_traj):
         col = 0
         for ts_k, c_k in zip(ts, counts, strict=True):
@@ -115,17 +123,21 @@ def aging_process(
     The instantaneous retention is ``a_t = exp(-1 / (base * (1 + t/aging_rate)))``
     so early states relax fast and late states relax slowly -- a glassy,
     coarsening-like memory whose two-time correlation depends on the waiting
-    time.  Used to validate :func:`chronospect.estimators.twotime.aging_index`.
+    time.  The innovation is scaled by ``sqrt(1 - a_t**2)`` so the *variance*
+    stays ~constant and the aging signal is a pure timescale ramp rather than a
+    confounded amplitude ramp.  Used to validate
+    :func:`chronospect.estimators.twotime.aging_index`.
     """
     rng = np.random.default_rng(seed)
     t = np.arange(T, dtype=float)
     a_t = np.exp(-1.0 / (base_timescale * (1.0 + t / aging_rate)))
+    innov = sigma * np.sqrt(np.clip(1.0 - a_t**2, 1e-6, None))
     out = np.empty((n_traj, T, d))
     for i in range(n_traj):
         for j in range(d):
             x = np.empty(T)
             x[0] = rng.normal(0.0, sigma)
             for tt in range(1, T):
-                x[tt] = a_t[tt] * x[tt - 1] + rng.normal(0.0, sigma)
+                x[tt] = a_t[tt] * x[tt - 1] + rng.normal(0.0, innov[tt])
             out[i, :, j] = x
     return out

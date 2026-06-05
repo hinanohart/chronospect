@@ -10,9 +10,9 @@ dynamic light scattering / rheology).  Peaks in ``w_k`` reveal the timescales
 actually present in the memory -- so a model that *claims* multiple memory
 speeds can be checked against what its trajectory actually contains.
 
-A small first-difference (Tikhonov) penalty keeps the spectrum from splitting a
-single true peak across many adjacent grid points without smearing distinct
-peaks together.
+A small second-difference (curvature) Tikhonov penalty keeps the spectrum from
+splitting a single true peak across many adjacent grid points without smearing
+distinct peaks together.
 
 This module also offers a wavelet octave-band energy view
 (:func:`octave_band_energy`) as an independent, assumption-light cross-check.
@@ -39,8 +39,8 @@ def relaxation_spectrum(
     """Recover ``(timescales, weights)`` from an autocorrelation ``C``.
 
     ``timescales`` is a log-spaced grid; ``weights`` are the non-negative
-    amplitudes.  ``smooth`` is the strength of a first-difference penalty on the
-    (log-grid) weights.
+    amplitudes.  ``smooth`` is the strength of a second-difference (curvature)
+    penalty on the (log-grid) weights; it is skipped when ``n_grid < 3``.
     """
     C = np.asarray(C, dtype=float)
     L = len(C)
@@ -52,18 +52,14 @@ def relaxation_spectrum(
     A = np.exp(-taus[:, None] / timescales[None, :])  # (L, n_grid)
     b = C.copy()
 
-    if smooth > 0:
+    if smooth > 0 and n_grid >= 3:
         # penalize curvature of the spectrum (second difference), scaled to A
         D = np.zeros((n_grid - 2, n_grid))
         for i in range(n_grid - 2):
             D[i, i] = 1.0
             D[i, i + 1] = -2.0
             D[i, i + 2] = 1.0
-        scale = (
-            smooth
-            * np.linalg.norm(A, ord="fro")
-            / max(np.linalg.norm(D, ord="fro"), 1e-12)
-        )
+        scale = smooth * np.linalg.norm(A, ord="fro") / max(np.linalg.norm(D, ord="fro"), 1e-12)
         A = np.vstack([A, scale * D])
         b = np.concatenate([b, np.zeros(n_grid - 2)])
 
@@ -114,9 +110,7 @@ def dominant_timescales(
         wsum = wseg.sum()
         # weighted geometric mean of the timescale
         logT = np.average(np.log(timescales[members]), weights=wseg)
-        peaks.append(
-            Peak(timescale=float(np.exp(logT)), weight=float(wsum), members=members)
-        )
+        peaks.append(Peak(timescale=float(np.exp(logT)), weight=float(wsum), members=members))
         i = j
 
     peaks = [p for p in peaks if p.weight >= rel_thresh * total]
@@ -169,7 +163,9 @@ def octave_band_energy(
     band_energy = np.zeros(level)
     for j in range(X.shape[1]):
         coeffs = pywt.wavedec(X[:, j], wavelet, level=level)
-        details = coeffs[1:]  # cA, cD_level, ..., cD_1  -> drop approximation
+        # wavedec returns [cA, cD_level (coarsest), ..., cD_1 (finest)];
+        # reverse the details so index 0 is the finest octave (finest -> coarsest)
+        details = coeffs[:0:-1]
         for k, cd in enumerate(details):
             band_energy[k] += float(np.sum(np.asarray(cd) ** 2))
     total = band_energy.sum()

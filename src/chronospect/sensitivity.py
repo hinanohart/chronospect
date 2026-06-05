@@ -58,7 +58,7 @@ class GateResult:
     checks: list[Check] = field(default_factory=list)
 
     def __str__(self) -> str:  # pragma: no cover - cosmetic
-        lines = [f"GATE {'PASS' if self.passed else 'FAIL'}"]
+        lines: list[str] = [f"GATE {'PASS' if self.passed else 'FAIL'}"]
         for c in self.checks:
             lines.append(f"  [{'ok' if c.passed else 'XX'}] {c.name}: {c.detail}")
         return "\n".join(lines)
@@ -72,7 +72,15 @@ def _within(value: float, target: float, tol: float) -> bool:
 
 
 def run_gate(seed: int = 0, *, T: int = 2048) -> GateResult:
-    """Run all pre-registered checks; return a :class:`GateResult`."""
+    """Run all pre-registered checks; return a :class:`GateResult`.
+
+    ``T`` is the synthetic trajectory length; horizons and waiting times scale
+    with it.  The pre-registered thresholds were fixed at the default ``T=2048``;
+    very small ``T`` is rejected because the long-horizon checks are meaningless
+    when there is no long horizon.
+    """
+    if T < 512:
+        raise ValueError("run_gate needs T >= 512 (long-horizon checks need a long horizon)")
     checks: list[Check] = []
 
     # ---- G1: recover two injected timescales ----
@@ -109,7 +117,7 @@ def run_gate(seed: int = 0, *, T: int = 2048) -> GateResult:
     )
 
     # ---- G3: multi-timescale retains capacity at a long horizon ----
-    long_h = 200
+    long_h = min(200, T // 4)
     _, cap_m = capacity_vs_horizon(Xm, max_lag=long_h)
     Xs_fast = single_timescale(T=T, timescale=5.0, n_traj=8, seed=seed + 2)
     _, cap_s = capacity_vs_horizon(Xs_fast, max_lag=long_h)
@@ -123,9 +131,9 @@ def run_gate(seed: int = 0, *, T: int = 2048) -> GateResult:
     )
 
     # ---- G4: aging detected on a genuinely aging memory (realistic small ensemble) ----
-    t_ws = np.array([100, 400, 800, 1200, 1600])
-    taus = np.arange(0, 250, 3)
-    tw_window = 64
+    t_ws = (np.linspace(0.05, 0.78, 5) * T).astype(int)
+    taus = np.arange(0, min(250, T // 8), 3)
+    tw_window = min(64, T // 32)
     Xa = aging_process(T=T, n_traj=8, seed=seed + 3)
     Ca = two_time_correlation(Xa, t_ws, taus, tw_window=tw_window)
     ai_age = aging_index(Ca, t_ws, taus)

@@ -47,6 +47,8 @@ class TimescaleReport:
 
 
 def _capacity_half(lags: np.ndarray, cap: np.ndarray) -> float:
+    valid = np.isfinite(cap)
+    lags, cap = np.asarray(lags)[valid], np.asarray(cap)[valid]
     if cap.size == 0 or cap[0] <= 0:
         return float("nan")
     target = cap[0] / 2.0
@@ -72,7 +74,11 @@ def analyze(
     ``X`` is ``(T, d)`` or an ensemble ``(n, T, d)``.
     """
     X = np.asarray(X, dtype=float)
+    if X.ndim not in (2, 3):
+        raise ValueError(f"X must be (T, d) or (n, T, d); got shape {X.shape}")
     T = X.shape[-2]
+    if T < 32:
+        raise ValueError(f"trajectory too short to analyze (T={T}); need at least ~32 steps")
     if max_lag is None:
         max_lag = min(T // 2, 600)
 

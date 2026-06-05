@@ -105,7 +105,7 @@ GATE PASS
   [ok] G1_recover_two_timescales: injected=(5.0, 100.0) recovered=[3.6, 65.2]
   [ok] G2_single_is_single: n_peaks=1 n_eff=1.20 (<1.8)
   [ok] G3_capacity_horizon: cap_multi[200]=1.004 > cap_fast[200]=0.093
-  [ok] G4_aging_detected: aging=0.804 stationary=0.000 (margin>=0.3)
+  [ok] G4_aging_detected: aging=0.990 stationary=0.000 (margin>=0.3)
   [ok] G5_no_false_aging: stationary multi-timescale aging=0.000 (<0.25)
 ```
 
