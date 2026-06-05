@@ -1,0 +1,61 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (${{ matrix.os }}, py${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Lint
+        run: ruff check src tests
+      - name: Test
+        run: pytest -q
+
+  honesty:
+    name: honest-marketing grep
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: No randomness in metric-returning modules
+        run: |
+          # estimators and the report must be deterministic functions of input;
+          # randomness is only allowed in synthetic.py / sensitivity.py (data generation).
+          if grep -rnE "(np\.random|random\.|default_rng)" src/chronospect/estimators src/chronospect/report.py; then
+            echo "ERROR: randomness found in a metric-returning module" >&2
+            exit 1
+          fi
+      - name: No fabricated superlatives in README
+        run: |
+          if grep -rniE "(state-of-the-art|world.?class|revolutionary|guaranteed best|permanent(ly)?|fully automatic)" README.md; then
+            echo "ERROR: unsupported marketing language in README" >&2
+            exit 1
+          fi
