@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "chronospect"
-version = "0.1.0a1"
+version = "0.2.0a1"
 description = "A CPU-only measurement instrument for the timescale spectrum and aging dynamics of a model's memory."
 readme = "README.md"
 license = { text = "MIT" }

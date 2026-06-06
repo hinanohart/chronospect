@@ -3,12 +3,12 @@
   "generated_by": "examples/generate_calibration.py",
   "note": "Synthetic single-timescale recovery. Numbers are reproducible; treat the recovered/injected ratio as how to READ the instrument (long timescales are shrinkage-affected estimates / lower bounds), not as a rescaling factor.",
   "env": {
-    "utc": "2026-06-06T03:52:15+00:00",
+    "utc": "2026-06-06T05:31:23+00:00",
     "python": "3.13.13",
     "numpy": "2.4.6",
     "scipy": "1.17.1",
     "pywavelets": "1.9.0",
-    "chronospect": "0.1.0a1"
+    "chronospect": "0.2.0a1"
   },
   "settings": {
     "injected_taus": [

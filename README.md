@@ -17,7 +17,7 @@ whether that memory is *stationary* or *aging* during training.
 
 It needs only a trajectory array and runs on a laptop CPU. No GPU, no model weights bundled, MIT licensed.
 
-> **Status: v0.1.0a1 (alpha).** The validation numbers below come from **synthetic** ground-truth data
+> **Status: v0.2.0a1 (alpha).** The validation numbers below come from **synthetic** ground-truth data
 > with known injected timescales (see [Validation](#validation-the-sensitivity-gate)). A small
 > [exploratory case study](examples/case_study.md) looks at real GRU and Titans memory before/after
 > training, but `chronospect` has **not** been used to publish a *validated* finding about a real model.

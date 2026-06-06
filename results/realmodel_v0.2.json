@@ -16,12 +16,12 @@
     "note": "injected timescales describe the TARGET signal, not a ground truth the model's memory is expected to reproduce."
   },
   "env": {
-    "utc": "2026-06-06T04:42:08+00:00",
+    "utc": "2026-06-06T05:34:17+00:00",
     "python": "3.13.13",
     "numpy": "2.4.6",
     "torch": "2.12.0",
     "titans_pytorch": "0.5.3",
-    "chronospect": "0.1.0a1"
+    "chronospect": "0.2.0a1"
   },
   "training_steps_min": 30,
   "before_after_changed": true,
