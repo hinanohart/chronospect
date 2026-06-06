@@ -21,10 +21,10 @@ jobs:
         os: [ubuntu-latest, windows-latest]
         python-version: ["3.10", "3.11", "3.12"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install
@@ -42,13 +42,14 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: No randomness in metric-returning modules
         run: |
           # estimators and the report must be deterministic functions of input;
-          # randomness is only allowed in synthetic.py / sensitivity.py (data generation).
+          # randomness is only allowed in synthetic.py / sensitivity.py (data generation)
+          # and calibration.py (seeded bootstrap CI, not a returned point estimate).
           if grep -rnE "(np\.random|random\.|default_rng)" src/chronospect/estimators src/chronospect/report.py; then
             echo "ERROR: randomness found in a metric-returning module" >&2
             exit 1
@@ -74,10 +75,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
       - name: Install (CPU torch + dev)
