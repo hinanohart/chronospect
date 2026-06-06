@@ -11,3 +11,12 @@ venv/
 *.npz
 *.npy
 .DS_Store
+
+# v0.2 build state (operational, not product)
+.chronospect-v2-progress.json
+.chronospect-v2.lock
+# local dev lockfile (CI installs via pip; v0.1 tracked no lockfile)
+uv.lock
+# quarantine dir is tracked (.gitkeep) but its contents are local debris
+experiments/_wip/*
+!experiments/_wip/.gitkeep

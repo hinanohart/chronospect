@@ -68,10 +68,18 @@ def analyze(
     max_lag: int | None = None,
     rel_thresh: float = 0.08,
     aging_waiting_times: np.ndarray | None = None,
+    bias_correct: bool = False,
 ) -> TimescaleReport:
     """Compute the full timescale report for a memory trajectory ``X``.
 
     ``X`` is ``(T, d)`` or an ensemble ``(n, T, d)``.
+
+    ``bias_correct`` (default ``False``) toggles the demeaning-bias correction in
+    :func:`chronospect.aggregate_autocorr`. It is off by default because, although
+    it improves long-timescale recovery, it can inflate the apparent spectral width
+    of a single-speed memory (see that function and :func:`chronospect.calibrate`);
+    enable it when long-timescale calibration matters more than the single-vs-multi
+    headline.
     """
     X = np.asarray(X, dtype=float)
     if X.ndim not in (2, 3):
@@ -82,7 +90,7 @@ def analyze(
     if max_lag is None:
         max_lag = min(T // 2, 600)
 
-    C = aggregate_autocorr(X, max_lag=max_lag)
+    C = aggregate_autocorr(X, max_lag=max_lag, bias_correct=bias_correct)
     grid, w = relaxation_spectrum(C)
     peaks = dominant_timescales(grid, w, rel_thresh=rel_thresh)
     neff = effective_n_timescales(w)

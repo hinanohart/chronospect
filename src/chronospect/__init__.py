@@ -15,6 +15,7 @@ Start with :func:`analyze`; validate the instrument with :func:`run_gate`.
 
 from __future__ import annotations
 
+from .calibration import CalibrationCurve, CalibrationPoint, calibrate
 from .estimators import (
     ForgettingFit,
     Peak,
@@ -30,16 +31,29 @@ from .estimators import (
     two_time_correlation,
     windowed_effective_rank,
 )
+from .loggers import (
+    TrajectoryRecorder,
+    from_snapshots,
+    record_rnn_states,
+    record_titans_memory,
+)
 from .report import TimescaleReport, analyze
 from .sensitivity import GateResult, run_gate
 
-__version__ = "0.1.0a1"
+__version__ = "0.2.0a1"
 
 __all__ = [
     "analyze",
     "TimescaleReport",
     "run_gate",
     "GateResult",
+    "calibrate",
+    "CalibrationCurve",
+    "CalibrationPoint",
+    "TrajectoryRecorder",
+    "record_rnn_states",
+    "record_titans_memory",
+    "from_snapshots",
     "aggregate_autocorr",
     "relaxation_spectrum",
     "dominant_timescales",
