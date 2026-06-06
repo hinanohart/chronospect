@@ -35,6 +35,7 @@ def aggregate_autocorr(
     demean: bool = True,
     weight_by_variance: bool = True,
     var_floor: float = 1e-12,
+    bias_correct: bool = False,
 ) -> np.ndarray:
     """Return ``C[tau]`` for ``tau = 0 .. max_lag`` (``C[0] == 1`` by construction).
 
@@ -49,6 +50,32 @@ def aggregate_autocorr(
     weight_by_variance:
         Weight dimensions by their variance fraction (so high-energy memory
         directions dominate); otherwise a plain mean over dimensions.
+    bias_correct:
+        Correct the finite-sample bias introduced by subtracting the *sample*
+        mean (``demean``). Demeaning lowers every estimated autocovariance by
+        roughly ``Var(x_bar)``, which is largest *relative* to the signal at long
+        lags and drags the tail toward (and through) zero, under-estimating long
+        timescales. When ``True`` a Bartlett-weighted estimate of ``Var(x_bar)``
+        (reusing the lags already computed) is added back to every autocovariance
+        before re-normalizing, which lifts the long-lag tail and noticeably
+        improves recovery of long timescales (see :func:`chronospect.calibrate`).
+
+        **Default is** ``False``. This is a deliberate, measured choice: lifting
+        the tail also injects a small amount of long-timescale weight into a
+        genuinely *single*-timescale spectrum (the inversion cannot tell a
+        bias-shrunk long timescale from a correctly-zero short-timescale tail --
+        that ambiguity is the inherent ill-posedness). Empirically this inflates
+        the effective number of timescales for a single-speed memory on a sizeable
+        fraction of seeds, which would weaken the single-vs-multi discrimination
+        the instrument is built on. So the correction is *opt-in*: enable it when
+        you specifically want better long-timescale calibration, and consult
+        :func:`chronospect.calibrate` for the recovered-vs-injected curve (and its
+        cost) at your settings. The residual finite-window shrinkage that remains
+        even with ``bias_correct=True`` is inherent and is disclosed, not removed.
+        Has no effect when ``demean=False``.
+
+        Note: adding ``x_bar**2`` directly is *not* equivalent -- it overshoots
+        and injects spurious peaks -- so the Bartlett estimator is used instead.
     """
     Xe = _as_ensemble(X)
     _n, T, _d = Xe.shape
@@ -70,14 +97,25 @@ def aggregate_autocorr(
     vk = var[keep]
     w = vk / vk.sum() if weight_by_variance else np.full(vk.shape, 1.0 / vk.size)
 
-    C = np.empty(max_lag + 1)
+    # raw (biased) lag-tau autocovariance per kept dimension: gamma[tau, dim]
+    gamma = np.empty((max_lag + 1, vk.size))
     for tau in range(max_lag + 1):
         a = Xk[:, : T - tau, :]
         b = Xk[:, tau:, :]
-        cov = (a * b).mean(axis=(0, 1))  # (dk,) lag-tau autocovariance
-        ac = cov / vk  # normalized -> per-dim autocorrelation
-        C[tau] = float(np.sum(w * ac))
-    # guard tiny numerical drift at tau=0
+        gamma[tau] = (a * b).mean(axis=(0, 1))
+
+    if bias_correct and demean:
+        # Var(x_bar) ~= (1/T)[gamma(0) + 2 sum_{k>=1}(1 - k/T) gamma(k)], per dim,
+        # using Bartlett (triangular) lag weights over the lags we already have.
+        k = np.arange(max_lag + 1)
+        bartlett = 1.0 - k / T
+        var_xbar = (gamma[0] + 2.0 * (bartlett[1:, None] * gamma[1:]).sum(axis=0)) / T
+        var_xbar = np.clip(var_xbar, 0.0, None)  # a variance estimate is non-negative
+        gamma = gamma + var_xbar[None, :]
+
+    denom = np.where(gamma[0] > var_floor, gamma[0], np.inf)  # dead dims contribute 0
+    ac = gamma / denom[None, :]  # (max_lag+1, dk) per-dim autocorrelation
+    C = np.asarray(ac @ w, dtype=float)  # variance-weighted sum over dims
     if C[0] != 0:
-        C = C / C[0]
+        C = C / C[0]  # guard tiny numerical drift at tau=0
     return C

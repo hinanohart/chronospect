@@ -1,0 +1,166 @@
+{
+  "schema": "chronospect-calibration-v0.2",
+  "generated_by": "examples/generate_calibration.py",
+  "note": "Synthetic single-timescale recovery. Numbers are reproducible; treat the recovered/injected ratio as how to READ the instrument (long timescales are shrinkage-affected estimates / lower bounds), not as a rescaling factor.",
+  "env": {
+    "utc": "2026-06-06T03:52:15+00:00",
+    "python": "3.13.13",
+    "numpy": "2.4.6",
+    "scipy": "1.17.1",
+    "pywavelets": "1.9.0",
+    "chronospect": "0.1.0a1"
+  },
+  "settings": {
+    "injected_taus": [
+      7.0,
+      20.0,
+      50.0,
+      100.0,
+      200.0,
+      300.0
+    ],
+    "T": 2048,
+    "n_traj": 8,
+    "seeds": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "n_boot": 400,
+    "boot_seed": 0
+  },
+  "curves": {
+    "bias_correct_off": {
+      "bias_correct": false,
+      "T": 2048,
+      "n_traj": 8,
+      "n_boot": 400,
+      "boot_seed": 0,
+      "points": [
+        {
+          "injected": 7.0,
+          "recovered_median": 6.7395275860231845,
+          "ratio_median": 0.9627896551461692,
+          "ratio_ci_low": 0.9585805418044492,
+          "ratio_ci_high": 0.9908012908376913,
+          "n_seeds": 8
+        },
+        {
+          "injected": 20.0,
+          "recovered_median": 18.592324377391797,
+          "ratio_median": 0.9296162188695898,
+          "ratio_ci_low": 0.9220052531775729,
+          "ratio_ci_high": 0.9623064856641987,
+          "n_seeds": 8
+        },
+        {
+          "injected": 50.0,
+          "recovered_median": 41.34765986330405,
+          "ratio_median": 0.8269531972660811,
+          "ratio_ci_low": 0.8121388814791264,
+          "ratio_ci_high": 0.867121471918662,
+          "n_seeds": 8
+        },
+        {
+          "injected": 100.0,
+          "recovered_median": 70.64375838508212,
+          "ratio_median": 0.7064375838508212,
+          "ratio_ci_low": 0.6878784308614975,
+          "ratio_ci_high": 0.7244053672227015,
+          "n_seeds": 8
+        },
+        {
+          "injected": 200.0,
+          "recovered_median": 111.98505936082306,
+          "ratio_median": 0.5599252968041153,
+          "ratio_ci_low": 0.5599252968041153,
+          "ratio_ci_high": 0.5728774455277142,
+          "n_seeds": 8
+        },
+        {
+          "injected": 300.0,
+          "recovered_median": 134.12191753374418,
+          "ratio_median": 0.44707305844581396,
+          "ratio_ci_low": 0.44707305844581396,
+          "ratio_ci_high": 0.5044965966251148,
+          "n_seeds": 8
+        }
+      ],
+      "single_speed_neff_median": 1.2153703541314194
+    },
+    "bias_correct_on": {
+      "bias_correct": true,
+      "T": 2048,
+      "n_traj": 8,
+      "n_boot": 400,
+      "boot_seed": 0,
+      "points": [
+        {
+          "injected": 7.0,
+          "recovered_median": 6.819275900719504,
+          "ratio_median": 0.9741822715313576,
+          "ratio_ci_low": 0.9702677046719304,
+          "ratio_ci_high": 0.9894714203363851,
+          "n_seeds": 8
+        },
+        {
+          "injected": 20.0,
+          "recovered_median": 19.345017776941443,
+          "ratio_median": 0.9672508888470721,
+          "ratio_ci_low": 0.9394348411611645,
+          "ratio_ci_high": 0.9949423374636174,
+          "n_seeds": 8
+        },
+        {
+          "injected": 50.0,
+          "recovered_median": 45.44244997974498,
+          "ratio_median": 0.9088489995948996,
+          "ratio_ci_low": 0.8959077367796558,
+          "ratio_ci_high": 0.9244694461162194,
+          "n_seeds": 8
+        },
+        {
+          "injected": 100.0,
+          "recovered_median": 79.98029897824135,
+          "ratio_median": 0.7998029897824135,
+          "ratio_ci_low": 0.7806938278681753,
+          "ratio_ci_high": 0.8325698715997968,
+          "n_seeds": 8
+        },
+        {
+          "injected": 200.0,
+          "recovered_median": 135.46082894992557,
+          "ratio_median": 0.6773041447496279,
+          "ratio_ci_low": 0.6706095876687209,
+          "ratio_ci_high": 0.7310860344201296,
+          "n_seeds": 8
+        },
+        {
+          "injected": 300.0,
+          "recovered_median": 182.38998963380638,
+          "ratio_median": 0.607966632112688,
+          "ratio_ci_low": 0.5844747818437422,
+          "ratio_ci_high": 0.6780413886690851,
+          "n_seeds": 8
+        }
+      ],
+      "single_speed_neff_median": 1.5487458940455165
+    }
+  },
+  "summary": {
+    "single_speed_neff_median": {
+      "off": 1.2154,
+      "on": 1.5487
+    },
+    "longest_injected_tau": 300.0,
+    "longest_tau_ratio_median": {
+      "off": 0.4471,
+      "on": 0.608
+    }
+  }
+}

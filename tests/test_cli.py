@@ -1,18 +1,11 @@
 import json
 
 import numpy as np
-import pytest
 
 from chronospect.cli import main
 from chronospect.synthetic import multi_timescale
 
 
-@pytest.mark.xfail(
-    reason="`gate` returns rc=1 while G6 calibration fails on the v0.1 estimator; "
-    "the demeaning-bias correction lands in S3 and turns this green (the "
-    "pre-registered G6 band is unchanged).",
-    strict=False,
-)
 def test_cli_gate(capsys):
     rc = main(["gate", "--seed", "0"])
     out = capsys.readouterr().out

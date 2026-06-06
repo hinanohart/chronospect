@@ -202,16 +202,18 @@ def run_gate(seed: int = 0, *, T: int = 2048) -> GateResult:
     )
 
     # ---- G6: calibration accuracy on HOLD-OUT timescales (v0.2) ----
-    # Single-timescale recovery on timescales disjoint from G1's. Uses the same
-    # aggregate_autocorr the instrument uses, so the v0.2 demeaning-bias correction
-    # (default-on) flows through here automatically once it lands.
+    # G6 explicitly enables the (opt-in) demeaning-bias correction and checks that
+    # ENABLING it recovers the long hold-out timescale into a pre-registered band:
+    # that is the gated proof the correction delivers a real long-timescale gain.
+    # The over-correction guard below checks the same enabled path does not split a
+    # single-timescale memory into more than one peak.
     g6_ratios: dict[float, float] = {}
     g6_parts: list[bool] = []
     for tau in CALIB_HOLDOUT_TAUS:
         rs: list[float] = []
         for i in range(len(CALIB_SEEDS)):
             Xt = single_timescale(T=CALIB_T, timescale=tau, n_traj=8, seed=200 + i)
-            Ct = aggregate_autocorr(Xt, max_lag=min(600, CALIB_T // 2))
+            Ct = aggregate_autocorr(Xt, max_lag=min(600, CALIB_T // 2), bias_correct=True)
             gt, wt = relaxation_spectrum(Ct)
             pks = dominant_timescales(gt, wt, rel_thresh=0.08)
             rs.append(max(pks, key=lambda p: p.weight).timescale / tau if pks else np.nan)
@@ -221,7 +223,9 @@ def run_gate(seed: int = 0, *, T: int = 2048) -> GateResult:
         g6_parts.append(bool(np.isfinite(med) and lo <= med <= hi))
     # over-correction guard: a single-timescale memory must still resolve to one peak
     Xsg = single_timescale(T=CALIB_T, timescale=20.0, n_traj=8, seed=250)
-    gsg, wsg = relaxation_spectrum(aggregate_autocorr(Xsg, max_lag=min(600, CALIB_T // 2)))
+    gsg, wsg = relaxation_spectrum(
+        aggregate_autocorr(Xsg, max_lag=min(600, CALIB_T // 2), bias_correct=True)
+    )
     g6_one_peak = len(dominant_timescales(gsg, wsg, rel_thresh=0.08)) == 1
     g6 = all(g6_parts) and g6_one_peak
     checks.append(
