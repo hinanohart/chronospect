@@ -18,6 +18,20 @@ G3  capacity-vs-horizon: the multi-timescale memory retains more capacity at a
     long horizon than the single fast-timescale memory.
 G4  aging: aging_index(aging_process) exceeds aging_index(stationary) by at
     least ``AGING_MARGIN`` and the stationary index is below ``AGING_FLAT_MAX``.
+G5  no false aging: a stationary *multi*-timescale memory's aging index stays
+    below ``AGING_FLAT_MAX`` (guards against small-ensemble false positives).
+G6  calibration on HOLD-OUT timescales (7, 40, 150, 300 -- disjoint from the
+    G1 timescales, so calibration cannot be tuned by fitting the G1 grid):
+    single-timescale recovery (recovered/injected, median over seeds) lands in
+    a pre-registered TWO-SIDED band per timescale, AND a single-timescale memory
+    still resolves to exactly one peak (an over-correction is a failure too).
+    The bands were fixed BEFORE the v0.2 demeaning-bias correction; with the
+    v0.1 estimator the longest hold-out timescale fails the band, which is what
+    the correction must lift -- the gate therefore has teeth and is not vacuous.
+G7  real-model smoke (torch-gated): an ``nn.GRU`` memory trajectory flows
+    through :func:`chronospect.analyze` end to end and yields a finite headline
+    and a non-empty verdict. Skipped (and counted as passing) when torch is not
+    installed, so the core test matrix stays torch-free.
 """
 
 from __future__ import annotations
@@ -43,6 +57,25 @@ TIMESCALE_TOL = 2.0  # recovered timescale within this multiplicative factor
 SINGLE_NEFF_MAX = 1.8  # single-speed memory: effective # timescales below this
 AGING_MARGIN = 0.30  # aging index must exceed stationary by at least this
 AGING_FLAT_MAX = 0.25  # a stationary memory's aging index must stay below this
+
+# --- G6 calibration thresholds (v0.2; pre-registered at S2 BEFORE the estimator
+#     change, informed by a READ-ONLY measurement of the v0.1 estimator, and never
+#     loosened afterwards). Ratio = recovered_dominant_timescale / injected, median
+#     over CALIB_SEEDS. Bands are TWO-SIDED: an over-correction that overshoots a
+#     timescale (or injects a spurious peak) must also fail. The hold-out timescales
+#     are disjoint from the G1 timescales (5, 100) so the calibration cannot be tuned
+#     by fitting the G1 grid. With the v0.1 estimator the longest hold-out timescale
+#     (300) recovers ~0.50 and FAILS its band below -- that gap is exactly what the
+#     v0.2 demeaning-bias correction must close, which keeps G6 non-vacuous. ---
+CALIB_HOLDOUT_TAUS = (7.0, 40.0, 150.0, 300.0)
+CALIB_T = 2048
+CALIB_SEEDS = (0, 1, 2)
+CALIB_BANDS: dict[float, tuple[float, float]] = {
+    7.0: (0.60, 1.50),  # short: should stay ~1.0; band guards against distortion
+    40.0: (0.60, 1.50),
+    150.0: (0.55, 1.50),
+    300.0: (0.58, 1.45),  # binding: v0.1 ~0.50 (fails); correction must reach >= 0.58
+}
 
 
 @dataclass
@@ -167,6 +200,69 @@ def run_gate(seed: int = 0, *, T: int = 2048) -> GateResult:
             f"stationary multi-timescale aging={ai_multi:.3f} (<{AGING_FLAT_MAX})",
         )
     )
+
+    # ---- G6: calibration accuracy on HOLD-OUT timescales (v0.2) ----
+    # Single-timescale recovery on timescales disjoint from G1's. Uses the same
+    # aggregate_autocorr the instrument uses, so the v0.2 demeaning-bias correction
+    # (default-on) flows through here automatically once it lands.
+    g6_ratios: dict[float, float] = {}
+    g6_parts: list[bool] = []
+    for tau in CALIB_HOLDOUT_TAUS:
+        rs: list[float] = []
+        for i in range(len(CALIB_SEEDS)):
+            Xt = single_timescale(T=CALIB_T, timescale=tau, n_traj=8, seed=200 + i)
+            Ct = aggregate_autocorr(Xt, max_lag=min(600, CALIB_T // 2))
+            gt, wt = relaxation_spectrum(Ct)
+            pks = dominant_timescales(gt, wt, rel_thresh=0.08)
+            rs.append(max(pks, key=lambda p: p.weight).timescale / tau if pks else np.nan)
+        med = float(np.nanmedian(rs))
+        g6_ratios[tau] = med
+        lo, hi = CALIB_BANDS[tau]
+        g6_parts.append(bool(np.isfinite(med) and lo <= med <= hi))
+    # over-correction guard: a single-timescale memory must still resolve to one peak
+    Xsg = single_timescale(T=CALIB_T, timescale=20.0, n_traj=8, seed=250)
+    gsg, wsg = relaxation_spectrum(aggregate_autocorr(Xsg, max_lag=min(600, CALIB_T // 2)))
+    g6_one_peak = len(dominant_timescales(gsg, wsg, rel_thresh=0.08)) == 1
+    g6 = all(g6_parts) and g6_one_peak
+    checks.append(
+        Check(
+            "G6_calibration_holdout",
+            bool(g6),
+            "recovered/injected "
+            + ", ".join(
+                f"{int(t)}:{g6_ratios[t]:.2f}[{CALIB_BANDS[t][0]},{CALIB_BANDS[t][1]}]"
+                for t in CALIB_HOLDOUT_TAUS
+            )
+            + f" single20_one_peak={g6_one_peak}",
+        )
+    )
+
+    # ---- G7: real-model smoke (torch-gated) ----
+    # Skipped (counted as passing) without torch so the core matrix stays torch-free.
+    try:
+        import torch
+
+        from .loggers import record_rnn_states
+        from .report import analyze as _analyze
+
+        torch.manual_seed(seed)
+        gru = torch.nn.GRU(8, 16)
+        states = record_rnn_states(gru, torch.randn(512, 8))
+        rep = _analyze(states)
+        g7 = (
+            bool(np.isfinite(rep.effective_n_timescales))
+            and isinstance(rep.verdict, str)
+            and len(rep.verdict) > 0
+        )
+        g7_detail = (
+            f"GRU(8,16) smoke: n_ts={rep.n_dominant_timescales} "
+            f"neff={rep.effective_n_timescales} verdict={rep.verdict!r}"
+        )
+    except ImportError:
+        g7, g7_detail = True, "skipped (torch not installed)"
+    except Exception as exc:  # a real pipeline failure is reported, not hidden
+        g7, g7_detail = False, f"FAILED: {type(exc).__name__}: {exc}"
+    checks.append(Check("G7_real_model_smoke", bool(g7), g7_detail))
 
     passed = all(c.passed for c in checks)
     return GateResult(passed=passed, checks=checks)
