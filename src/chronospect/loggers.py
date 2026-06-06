@@ -21,7 +21,12 @@ from typing import Any
 
 import numpy as np
 
-__all__ = ["TrajectoryRecorder", "record_rnn_states", "from_snapshots"]
+__all__ = [
+    "TrajectoryRecorder",
+    "record_rnn_states",
+    "record_titans_memory",
+    "from_snapshots",
+]
 
 
 def _to_row(x: Any) -> np.ndarray:
@@ -124,6 +129,38 @@ def record_rnn_states(rnn: Any, inputs: Any) -> np.ndarray:
             hid = h[0] if isinstance(h, tuple) else h  # LSTM -> (h, c)
             frames.append(_to_row(hid[-1]))  # top layer
     return np.stack(frames, axis=0)
+
+
+def record_titans_memory(memory: Any, seq: Any) -> np.ndarray:
+    """Record a chunked test-time memory module's per-step *readout* trajectory.
+
+    ``memory`` is any module whose ``forward(seq)`` returns either the read-out
+    tensor or a ``(readout, state)`` tuple -- Titans' ``NeuralMemory`` is the
+    canonical example.  ``seq`` is a ``(T, dim)``, ``(1, T, dim)`` or
+    ``(n, T, dim)`` torch tensor.  Returns the readout as ``(T, d)`` (single
+    sequence) or ``(n, T, d)`` (ensemble), ready for :func:`chronospect.analyze`.
+
+    Why the readout, not the raw fast-weights?  ``analyze`` consumes a trajectory
+    shaped ``(T, d)``; a flattened fast-weight snapshot per chunk has ``d`` far
+    larger than the number of chunks ``T``, which makes the capacity estimator's
+    whitening singular (and slow).  The readout -- what the memory returns when
+    queried at each step -- is the low-dimensional *observable* memory signal and
+    keeps ``T >> d``.  It still reflects the test-time-updated memory state, so
+    training-induced changes show up in its timescale spectrum.
+
+    Duck-typed (no dependency on any specific memory library); torch is only used
+    to detach the tensor.
+    """
+    out = memory(seq)
+    readout = out[0] if isinstance(out, tuple) else out
+    if hasattr(readout, "detach"):
+        readout = readout.detach().to("cpu").numpy()
+    arr = np.asarray(readout, dtype=float)
+    if arr.ndim == 2:  # (T, d)
+        return arr
+    if arr.ndim == 3:  # (n, T, d); collapse a singleton batch to (T, d)
+        return arr[0] if arr.shape[0] == 1 else arr
+    raise ValueError(f"memory readout must be (T, d) or (n, T, d); got shape {arr.shape}")
 
 
 def from_snapshots(snapshots: list[Any]) -> np.ndarray:

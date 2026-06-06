@@ -31,6 +31,12 @@ from .estimators import (
     two_time_correlation,
     windowed_effective_rank,
 )
+from .loggers import (
+    TrajectoryRecorder,
+    from_snapshots,
+    record_rnn_states,
+    record_titans_memory,
+)
 from .report import TimescaleReport, analyze
 from .sensitivity import GateResult, run_gate
 
@@ -44,6 +50,10 @@ __all__ = [
     "calibrate",
     "CalibrationCurve",
     "CalibrationPoint",
+    "TrajectoryRecorder",
+    "record_rnn_states",
+    "record_titans_memory",
+    "from_snapshots",
     "aggregate_autocorr",
     "relaxation_spectrum",
     "dominant_timescales",
