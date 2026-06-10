@@ -27,42 +27,6 @@ It needs only a trajectory array and runs on a laptop CPU. No GPU, no model weig
 
 ---
 
-## Architecture overview
-
-```mermaid
-flowchart TD
-    INPUT[Memory trajectory<br>shape T_d or n_T_d] --> AUTOCORR[aggregate_autocorr<br>lag autocorrelation]
-    AUTOCORR --> SPECTRUM[relaxation_spectrum<br>NNLS over log-grid]
-    SPECTRUM --> PEAKS[dominant_timescales<br>effective_n_timescales]
-    INPUT --> TWOTIME[two_time_correlation<br>C tw tw+tau]
-    TWOTIME --> AGING[aging_index<br>stationary vs aging]
-    INPUT --> CAPACITY[capacity_vs_horizon<br>observability Gramian]
-    AUTOCORR --> FORGETTING[forgetting_fit<br>Benna-Fusi yardstick]
-    INPUT --> OCTAVE[octave_band_energy<br>wavelet multi-resolution]
-    PEAKS --> REPORT[TimescaleReport<br>verdict + all diagnostics]
-    AGING --> REPORT
-    CAPACITY --> REPORT
-    FORGETTING --> REPORT
-    OCTAVE --> REPORT
-```
-
----
-
-## Why these methods (the cross-disciplinary part)
-
-Each diagnostic imports a mature idea from another field that, as far as we can find, has **not** been
-applied to model memory as a shipped instrument:
-
-| Diagnostic | Borrowed from | What it measures |
-|---|---|---|
-| `relaxation_spectrum` | dynamic-light-scattering / rheology relaxation spectra (non-negative least squares over a log-grid of exponentials) | the timescales present in the autocorrelation |
-| `two_time_correlation` + `aging_index` | the **two-time correlation `C(t_w, t_w+τ)` of glassy / spin-glass physics** | whether memory dynamics are stationary or *aging* |
-| `capacity_vs_horizon` | the **observability Gramian** of control theory, made data-driven via whitened canonical correlations | how many past directions remain recoverable at horizon `τ` |
-| `octave_band_energy` | **wavelet multi-resolution analysis** | update energy per frequency octave (an assumption-light cross-check) |
-| `forgetting_fit` | the **Benna–Fusi cascade memory** optimal forgetting law (`τ^-1/2`) | exponential vs power-law decay (a *reference yardstick*, never a headline) |
-
----
-
 ## Install
 
 ```bash
@@ -152,6 +116,42 @@ The `verdict` field of `TimescaleReport` combines the spectral result (`n_domina
 
 ---
 
+## Architecture overview
+
+```mermaid
+flowchart TD
+    INPUT[Memory trajectory<br>shape T_d or n_T_d] --> AUTOCORR[aggregate_autocorr<br>lag autocorrelation]
+    AUTOCORR --> SPECTRUM[relaxation_spectrum<br>NNLS over log-grid]
+    SPECTRUM --> PEAKS[dominant_timescales<br>effective_n_timescales]
+    INPUT --> TWOTIME[two_time_correlation<br>C tw tw+tau]
+    TWOTIME --> AGING[aging_index<br>stationary vs aging]
+    INPUT --> CAPACITY[capacity_vs_horizon<br>observability Gramian]
+    AUTOCORR --> FORGETTING[forgetting_fit<br>Benna-Fusi yardstick]
+    INPUT --> OCTAVE[octave_band_energy<br>wavelet multi-resolution]
+    PEAKS --> REPORT[TimescaleReport<br>verdict + all diagnostics]
+    AGING --> REPORT
+    CAPACITY --> REPORT
+    FORGETTING --> REPORT
+    OCTAVE --> REPORT
+```
+
+---
+
+## Why these methods (the cross-disciplinary part)
+
+Each diagnostic imports a mature idea from another field that, as far as we can find, has **not** been
+applied to model memory as a shipped instrument:
+
+| Diagnostic | Borrowed from | What it measures |
+|---|---|---|
+| `relaxation_spectrum` | Dynamic-light-scattering / rheology relaxation spectra (NNLS over a log-grid of exponentials) | Timescales present in the autocorrelation |
+| `two_time_correlation` + `aging_index` | Two-time correlation `C(t_w, t_w+τ)` of glassy / spin-glass physics | Whether memory dynamics are stationary or *aging* |
+| `capacity_vs_horizon` | Observability Gramian of control theory, made data-driven via whitened canonical correlations | How many past directions remain recoverable at horizon `τ` |
+| `octave_band_energy` | Wavelet multi-resolution analysis | Update energy per frequency octave (assumption-light cross-check) |
+| `forgetting_fit` | Benna–Fusi cascade memory optimal forgetting law (`τ^-1/2`) | Exponential vs power-law decay (reference yardstick only) |
+
+---
+
 ## Validation: the sensitivity gate
 
 Before pointing the instrument at any real model it must recover structure it *injected itself*.
@@ -211,15 +211,15 @@ Read a recovered long timescale as a **shrinkage-affected estimate / lower bound
 timescales 7/40/150/300 — so its printed ratios differ slightly from this fuller curve; both are
 reproducible synthetic runs.)
 
-An **opt-in** demeaning-bias correction (`aggregate_autocorr(..., bias_correct=True)`, also reachable as
-`analyze(..., bias_correct=True)`) removes the *identifiable* finite-sample part of the shrinkage and
-lifts long-timescale recovery (e.g. τ=300 from 0.45 to 0.61) — but it **cannot** remove the residual
-finite-window shrinkage, and it has a cost: it broadens the apparent spectrum of a genuinely
-single-speed memory (effective number of timescales 1.22 → 1.55 in the same run). It is therefore **off
-by default** — the default preserves the single-vs-multi discrimination the gate checks — and you enable
-it when long-timescale calibration matters more than the single-vs-multi headline. `chronospect` never
-silently rescales a reading and never claims exact point recovery (it does not claim a recovered 100
-from an injected 100).
+An **opt-in** demeaning-bias correction is available:
+
+- Enable via `aggregate_autocorr(..., bias_correct=True)` or `analyze(..., bias_correct=True)`.
+- Lifts long-timescale recovery (e.g. τ=300 from 0.45 to 0.61) by removing the *identifiable* finite-sample part of shrinkage.
+- **Cannot** remove the residual finite-window shrinkage.
+- **Cost:** broadens the apparent spectrum of a genuinely single-speed memory (effective timescales 1.22 → 1.55).
+- **Off by default** — the default preserves the single-vs-multi discrimination the gate checks. Enable it when long-timescale calibration matters more than the single-vs-multi headline.
+
+`chronospect` never silently rescales a reading and never claims exact point recovery.
 
 ---
 
@@ -227,14 +227,17 @@ from an injected 100).
 
 [`examples/case_study.md`](examples/case_study.md) trains a small `nn.GRU` and a Titans `NeuralMemory`
 on a toy next-step-prediction task and reads each model's memory-trajectory spectrum **before and after
-training** on a held-out probe (`results/realmodel_v0.2.json`; regenerate with `python
-examples/run_case_study.py`). It is deliberately narrow: it shows the instrument **responds to learning**
-— the recovered spectrum changes once the model has been trained — and nothing more. It is
-**exploratory** (tiny CPU configs, synthetic toy data, one seed per model) and makes **no cross-model
-comparison or ranking** and no claim that a recovered timescale equals an injected one. For instance the
-Titans readout's verdict moves from "effectively single-speed" before training to "multi-timescale"
-after, and the GRU's recovered fast peak shifts with training; see the case study for the full tables
-and caveats.
+training** on a held-out probe (`results/realmodel_v0.2.json`; regenerate with `python examples/run_case_study.py`).
+
+This case study is deliberately narrow:
+
+- Shows the instrument **responds to learning** — the recovered spectrum changes once the model has been trained.
+- Makes **no cross-model comparison or ranking** and no claim that a recovered timescale equals an injected one.
+- Uses tiny CPU configs, synthetic toy data, one seed per model — **exploratory only**.
+
+For example: the Titans readout's verdict moves from "effectively single-speed" before training to
+"multi-timescale" after, and the GRU's recovered fast peak shifts with training. See the case study
+for full tables and caveats.
 
 ---
 
