@@ -124,7 +124,7 @@ X = from_snapshots([snapshot_after_task_i for i in range(n_tasks)])  # (n_tasks,
 
 ## How it works
 
-`cs.analyze(X)` is the single entry point. Under the hood it runs five estimators in sequence:
+`cs.analyze(X)` is the single entry point. Under the hood it runs six estimators in sequence:
 
 1. **Autocorrelation** (`aggregate_autocorr`) — computes a lag-autocorrelation curve, averaging
    across the `d` dimensions and, if given an ensemble, across the `n` runs.
@@ -142,6 +142,9 @@ X = from_snapshots([snapshot_after_task_i for i in range(n_tasks)])  # (n_tasks,
 5. **Forgetting yardstick** (`forgetting_fit`) — fits the autocorrelation tail to both a single
    exponential and the Benna–Fusi power law `τ^-1/2`, and reports which fits better. This is a
    reference yardstick only, never reported as a standalone finding.
+6. **Octave-band energy** (`octave_band_energy`) — decomposes the trajectory via wavelet
+   multi-resolution analysis and reports the fraction of detail energy in each frequency octave,
+   as an assumption-light cross-check of the spectral result.
 
 The `verdict` field of `TimescaleReport` combines the spectral result (`n_dominant_timescales`,
 `effective_n_timescales`) with the aging result to produce a plain-English summary such as
