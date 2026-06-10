@@ -27,6 +27,27 @@ It needs only a trajectory array and runs on a laptop CPU. No GPU, no model weig
 
 ---
 
+## Architecture overview
+
+```mermaid
+flowchart TD
+    INPUT[Memory trajectory\nshape T_d or n_T_d] --> AUTOCORR[aggregate_autocorr\nlag autocorrelation]
+    AUTOCORR --> SPECTRUM[relaxation_spectrum\nNNLS over log-grid]
+    SPECTRUM --> PEAKS[dominant_timescales\neffective_n_timescales]
+    INPUT --> TWOTIME[two_time_correlation\nC tw tw+tau]
+    TWOTIME --> AGING[aging_index\nstationary vs aging]
+    INPUT --> CAPACITY[capacity_vs_horizon\nobservability Gramian]
+    AUTOCORR --> FORGETTING[forgetting_fit\nBenna-Fusi yardstick]
+    INPUT --> OCTAVE[octave_band_energy\nwavelet multi-resolution]
+    PEAKS --> REPORT[TimescaleReport\nverdict + all diagnostics]
+    AGING --> REPORT
+    CAPACITY --> REPORT
+    FORGETTING --> REPORT
+    OCTAVE --> REPORT
+```
+
+---
+
 ## Why these methods (the cross-disciplinary part)
 
 Each diagnostic imports a mature idea from another field that, as far as we can find, has **not** been
@@ -39,6 +60,8 @@ applied to model memory as a shipped instrument:
 | `capacity_vs_horizon` | the **observability Gramian** of control theory, made data-driven via whitened canonical correlations | how many past directions remain recoverable at horizon `τ` |
 | `octave_band_energy` | **wavelet multi-resolution analysis** | update energy per frequency octave (an assumption-light cross-check) |
 | `forgetting_fit` | the **Benna–Fusi cascade memory** optimal forgetting law (`τ^-1/2`) | exponential vs power-law decay (a *reference yardstick*, never a headline) |
+
+---
 
 ## Install
 
@@ -53,6 +76,8 @@ Or from source:
 git clone https://github.com/hinanohart/chronospect
 cd chronospect && pip install -e ".[dev]"
 ```
+
+---
 
 ## Quickstart
 
@@ -95,6 +120,35 @@ X = record_rnn_states(torch.nn.GRU(8, 16), inputs)   # (T, 16)
 X = from_snapshots([snapshot_after_task_i for i in range(n_tasks)])  # (n_tasks, d)
 ```
 
+---
+
+## How it works
+
+`cs.analyze(X)` is the single entry point. Under the hood it runs five estimators in sequence:
+
+1. **Autocorrelation** (`aggregate_autocorr`) — computes a lag-autocorrelation curve, averaging
+   across the `d` dimensions and, if given an ensemble, across the `n` runs.
+2. **Relaxation spectrum** (`relaxation_spectrum`) — fits the autocorrelation curve to a
+   non-negative weighted sum of exponentials on a log-spaced timescale grid (NNLS). The resulting
+   weight profile is the spectrum. `dominant_timescales` then picks peaks above a relative
+   threshold; `effective_n_timescales` summarises the spread as an entropy-like scalar.
+3. **Capacity vs horizon** (`capacity_vs_horizon`) — uses a data-driven observability Gramian
+   (whitened canonical correlations) to estimate how many independent "past directions" survive
+   each lag `τ`. The half-capacity lag is reported as `capacity_horizon_half`.
+4. **Two-time correlation and aging** (`two_time_correlation`, `aging_index`) — computes
+   `C(t_w, t_w + τ)` for a range of waiting times `t_w`, then checks whether the curves shift as
+   `t_w` grows (aging) or remain constant (stationary). A significance-gated slope test produces
+   the `aging_index`.
+5. **Forgetting yardstick** (`forgetting_fit`) — fits the autocorrelation tail to both a single
+   exponential and the Benna–Fusi power law `τ^-1/2`, and reports which fits better. This is a
+   reference yardstick only, never reported as a standalone finding.
+
+The `verdict` field of `TimescaleReport` combines the spectral result (`n_dominant_timescales`,
+`effective_n_timescales`) with the aging result to produce a plain-English summary such as
+`"multi-timescale; approximately stationary"`.
+
+---
+
 ## Validation: the sensitivity gate
 
 Before pointing the instrument at any real model it must recover structure it *injected itself*.
@@ -130,6 +184,8 @@ GATE PASS
 
 The gate is also the test suite (`pytest`), run across multiple seeds.
 
+---
+
 ## Calibration: how to read a recovered timescale
 
 Recovering a relaxation timescale from a finite window is an ill-posed inverse problem: **long
@@ -162,6 +218,8 @@ it when long-timescale calibration matters more than the single-vs-multi headlin
 silently rescales a reading and never claims exact point recovery (it does not claim a recovered 100
 from an injected 100).
 
+---
+
 ## Exploratory case study (not validation)
 
 [`examples/case_study.md`](examples/case_study.md) trains a small `nn.GRU` and a Titans `NeuralMemory`
@@ -174,6 +232,8 @@ comparison or ranking** and no claim that a recovered timescale equals an inject
 Titans readout's verdict moves from "effectively single-speed" before training to "multi-timescale"
 after, and the GRU's recovered fast peak shifts with training; see the case study for the full tables
 and caveats.
+
+---
 
 ## Honest limitations
 
@@ -190,6 +250,8 @@ and caveats.
   memory read the two-time / aging output first.
 - The Benna–Fusi power-law fit is a **reference yardstick only** — a single power-law fit is close to
   trivial and is never reported as a standalone claim.
+
+---
 
 ## Prior work and relation to it
 
@@ -209,6 +271,8 @@ repositories ship *training* dashboards (loss / throughput), not a memory-timesc
 
 This is a measurement instrument, not a method that improves a model. If you find a place where this
 measurement is already shipped, please open an issue — we would rather cite it than duplicate it.
+
+---
 
 ## License
 
