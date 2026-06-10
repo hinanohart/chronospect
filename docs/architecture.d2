@@ -1,0 +1,48 @@
+direction: down
+explanation: |md
+  ### chronospect
+  **CPU-only measurement instrument for the timescale spectrum and aging dynamics of a model's memory.**
+| {near: top-center}
+
+input: "① Memory Trajectory\nshape T×d or n×T×d" {shape: oval; style: {fill: "#6366f1"; font-color: "#ffffff"; stroke: "#4338ca"; bold: true; font-size: 18}}
+
+analysis: "Analysis Engines" {
+  style: {fill: "#f0fdf4"; stroke: "#10b981"; font-color: "#065f46"; bold: true; font-size: 16}
+  autocorr: "② aggregate_autocorr\nlag autocorrelation"
+  twotime: "② two_time_correlation\nC(tw, tw+τ)"
+  capacity: "② capacity_vs_horizon\nobservability Gramian"
+  octave: "② octave_band_energy\nwavelet multi-resolution"
+  *.style.fill: "#dcfce7"; *.style.font-color: "#065f46"
+}
+
+derived: "Derived Metrics" {
+  style: {fill: "#fffbeb"; stroke: "#f59e0b"; font-color: "#92400e"; bold: true; font-size: 16}
+  spectrum: "③ relaxation_spectrum\nNNLS over log-grid"
+  peaks: "③ dominant_timescales\neffective_n_timescales"
+  aging: "③ aging_index\nstationary vs aging"
+  forgetting: "③ forgetting_fit\nBenna-Fusi yardstick"
+  *.style.fill: "#fef3c7"; *.style.font-color: "#92400e"
+}
+
+report: "④ TimescaleReport\nverdict + all diagnostics" {shape: cylinder; style: {fill: "#fdf2f8"; stroke: "#ec4899"; font-color: "#9d174e"; bold: true; font-size: 18}}
+
+input -> analysis.autocorr: "② analyze"
+input -> analysis.twotime: "② analyze"
+input -> analysis.capacity: "② analyze"
+input -> analysis.octave: "② analyze"
+analysis.autocorr -> derived.spectrum: "③ fit"
+derived.spectrum -> derived.peaks: "③ extract"
+analysis.twotime -> derived.aging: "③ classify"
+analysis.autocorr -> derived.forgetting: "③ fit"
+derived.peaks -> report: "④ emit"
+derived.aging -> report: "④ emit"
+derived.forgetting -> report: "④ emit"
+analysis.capacity -> report: "④ emit"
+analysis.octave -> report: "④ emit"
+
+legend: "Legend" {
+  near: bottom-center
+  style: {fill: "#f8fafc"; stroke: "#cbd5e1"; font-size: 13}
+  e: "● entry"; c: "● analysis"; p: "● derived"; d: "● output"
+  e.style.font-color: "#4338ca"; c.style.font-color: "#10b981"; p.style.font-color: "#f59e0b"; d.style.font-color: "#ec4899"
+}
