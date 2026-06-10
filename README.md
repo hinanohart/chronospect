@@ -31,15 +31,15 @@ It needs only a trajectory array and runs on a laptop CPU. No GPU, no model weig
 
 ```mermaid
 flowchart TD
-    INPUT[Memory trajectory\nshape T_d or n_T_d] --> AUTOCORR[aggregate_autocorr\nlag autocorrelation]
-    AUTOCORR --> SPECTRUM[relaxation_spectrum\nNNLS over log-grid]
-    SPECTRUM --> PEAKS[dominant_timescales\neffective_n_timescales]
-    INPUT --> TWOTIME[two_time_correlation\nC tw tw+tau]
-    TWOTIME --> AGING[aging_index\nstationary vs aging]
-    INPUT --> CAPACITY[capacity_vs_horizon\nobservability Gramian]
-    AUTOCORR --> FORGETTING[forgetting_fit\nBenna-Fusi yardstick]
-    INPUT --> OCTAVE[octave_band_energy\nwavelet multi-resolution]
-    PEAKS --> REPORT[TimescaleReport\nverdict + all diagnostics]
+    INPUT[Memory trajectory<br>shape T_d or n_T_d] --> AUTOCORR[aggregate_autocorr<br>lag autocorrelation]
+    AUTOCORR --> SPECTRUM[relaxation_spectrum<br>NNLS over log-grid]
+    SPECTRUM --> PEAKS[dominant_timescales<br>effective_n_timescales]
+    INPUT --> TWOTIME[two_time_correlation<br>C tw tw+tau]
+    TWOTIME --> AGING[aging_index<br>stationary vs aging]
+    INPUT --> CAPACITY[capacity_vs_horizon<br>observability Gramian]
+    AUTOCORR --> FORGETTING[forgetting_fit<br>Benna-Fusi yardstick]
+    INPUT --> OCTAVE[octave_band_energy<br>wavelet multi-resolution]
+    PEAKS --> REPORT[TimescaleReport<br>verdict + all diagnostics]
     AGING --> REPORT
     CAPACITY --> REPORT
     FORGETTING --> REPORT
